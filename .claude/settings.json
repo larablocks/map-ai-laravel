@@ -1,0 +1,13 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(vendor/bin/sail artisan test *)",
+            "Bash(composer test *)",
+            "Bash(vendor/bin/pest *)",
+            "Bash(composer analyse *)",
+            "mcp__laravel-boost__database-schema",
+            "mcp__laravel-boost__search-docs",
+            "mcp__laravel-boost__last-error"
+        ]
+    }
+}

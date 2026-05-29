@@ -3,6 +3,7 @@
 namespace larablocks\MapAi;
 
 use Illuminate\Support\ServiceProvider;
+use larablocks\MapAi\Commands\DiffCommand;
 use larablocks\MapAi\Commands\InstallCommand;
 
 class MapAiServiceProvider extends ServiceProvider
@@ -12,6 +13,7 @@ class MapAiServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 InstallCommand::class,
+                DiffCommand::class,
             ]);
         }
     }

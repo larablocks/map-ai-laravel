@@ -18,16 +18,10 @@
             "role": "Developer"
         }
     ],
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../map-ai"
-        }
-    ],
     "require": {
-        "php": "^8.4",
+        "php": "^8.2",
         "illuminate/contracts": "^11.0||^12.0||^13.0",
-        "larablocks/map-ai": "@dev"
+        "larablocks/map-ai": "^0.1.1"
     },
     "require-dev": {
         "laravel/pint": "^1.14",
