@@ -3,12 +3,14 @@
 namespace larablocks\MapAi\Commands;
 
 use Illuminate\Console\Command;
+use larablocks\MapAi\Commands\Concerns\ProcessesStubContent;
 use larablocks\MapAi\Commands\Concerns\RendersDiff;
 use larablocks\MapAi\Installer;
 
 class InstallCommand extends Command
 {
-    use RendersDiff;
+    use ProcessesStubContent, RendersDiff;
+
     protected $signature = 'map:install {--force : Overwrite existing files}';
 
     protected $description = 'Install the MAP AI documentation scaffold into this project';
@@ -114,13 +116,13 @@ class InstallCommand extends Command
         }
         $this->info($summary.'.');
 
-        $skipped = array_column(
+        $skippedFiles = array_column(
             array_filter($result['files'], fn (array $f) => $f['action'] === 'skip'),
             'file'
         );
 
         $outOfDate = array_values(array_filter(
-            $skipped,
+            $skippedFiles,
             fn (string $file) => file_get_contents(Installer::stubsPath().'/'.$file) !== file_get_contents($targetPath.'/'.$file)
         ));
 
@@ -133,18 +135,25 @@ class InstallCommand extends Command
                 $stub = Installer::stubsPath().'/'.$file;
                 $project = $targetPath.'/'.$file;
 
+                $effectiveContent = $this->processStubContent($file, (string) file_get_contents($stub), $targetPath);
+
                 $this->newLine();
                 $this->line("  <fg=blue>[MODIFIED]</>  {$file}");
                 $this->newLine();
-                $this->showDiff($stub, $project);
+                $diff = $this->showDiffFromContent($effectiveContent, $project);
                 $this->newLine();
 
-                if ($this->confirm("Apply stub changes to {$file}?", false)) {
+                $newContent = $this->extractNewStubContent($diff);
+
+                if (trim($newContent) === '') {
+                    $this->line("  <fg=gray>[NO NEW CONTENT]</>  All differences are your customisations — nothing to apply automatically.");
+                } elseif ($this->confirm("Append new stub content to {$file}?", true)) {
+                    $existing = (string) file_get_contents($project);
                     copy($project, $project.'.bak');
-                    copy($stub, $project);
-                    $this->line("  <fg=green>[APPLIED]</>   {$file}  (original saved as {$file}.bak)");
+                    file_put_contents($project, rtrim($existing)."\n\n".$newContent."\n");
+                    $this->line("  <fg=green>[UPDATED]</>   {$file}  (new content appended, original saved as {$file}.bak)");
                 } else {
-                    $this->line("  <fg=yellow>[KEPT]</>      {$file}");
+                    $this->line("  <fg=yellow>[SKIPPED]</>   {$file}");
                 }
             }
 
@@ -170,17 +179,11 @@ class InstallCommand extends Command
         }
 
         $path = $targetPath.'/AGENTS.md';
-        $content = (string) file_get_contents($path);
-        $content = str_replace('[DATE]', date('Y-m-d'), $content);
+        $content = $this->processStubContent('AGENTS.md', (string) file_get_contents($path), $targetPath);
+        file_put_contents($path, $content);
 
         $detectedInfo = $this->detectProjectInfo($targetPath);
         $detectedCommands = $this->detectCommands($targetPath);
-
-        foreach (array_merge($detectedInfo, $detectedCommands) as $placeholder => $value) {
-            $content = str_replace($placeholder, $value, $content);
-        }
-
-        file_put_contents($path, $content);
 
         $this->newLine();
         $this->line('Auto-detecting project info and commands for AGENTS.md...');
@@ -216,122 +219,50 @@ class InstallCommand extends Command
         }
     }
 
-    /** @return array<string, string> */
-    private function detectProjectInfo(string $targetPath): array
+    /**
+     * Parse a unified diff (stub vs project) and extract lines that are in the stub
+     * but completely absent from the project with no conflicting user content in the same hunk.
+     * Hunks that mix stub additions with user additions are skipped — those are areas
+     * the user has customised and should not be touched automatically.
+     */
+    private function extractNewStubContent(string $diff): string
     {
-        $composer = [];
-        $composerPath = $targetPath.'/composer.json';
-        if (file_exists($composerPath)) {
-            $composer = (array) (json_decode((string) file_get_contents($composerPath), true) ?? []);
-        }
-        $require = (array) ($composer['require'] ?? []);
+        $lines = explode("\n", $diff);
+        $inHunk = false;
+        $hunkNewLines = [];
+        $hunkHasUserAdditions = false;
+        $result = [];
 
-        $detected = [];
+        foreach ($lines as $line) {
+            if (str_starts_with($line, '@@')) {
+                if ($inHunk && ! $hunkHasUserAdditions && $hunkNewLines !== []) {
+                    $result = array_merge($result, $hunkNewLines);
+                }
+                $inHunk = true;
+                $hunkNewLines = [];
+                $hunkHasUserAdditions = false;
+                continue;
+            }
 
-        // Project name from composer.json "name", falling back to directory basename
-        if (isset($composer['name']) && is_string($composer['name'])) {
-            $parts = explode('/', $composer['name']);
-            $detected['[PROJECT NAME]'] = ucwords(str_replace(['-', '_'], ' ', end($parts)));
-        } else {
-            $detected['[PROJECT NAME]'] = ucwords(str_replace(['-', '_'], ' ', basename($targetPath)));
-        }
+            if (str_starts_with($line, '---') || str_starts_with($line, '+++')) {
+                continue;
+            }
 
-        // Stack: build a comma-separated list of detected components
-        $stack = [];
+            if (! $inHunk) {
+                continue;
+            }
 
-        if (isset($require['laravel/framework']) && is_string($require['laravel/framework'])) {
-            preg_match('/\d+/', $require['laravel/framework'], $m);
-            $stack[] = isset($m[0]) ? "Laravel {$m[0]}" : 'Laravel';
-        }
-
-        if (isset($require['php']) && is_string($require['php'])) {
-            preg_match('/\d+\.\d+/', $require['php'], $m);
-            $stack[] = isset($m[0]) ? "PHP {$m[0]}" : 'PHP';
-        }
-
-        $envPath = $targetPath.'/.env.example';
-        $env = file_exists($envPath) ? (string) file_get_contents($envPath) : '';
-
-        if ($env !== '' && preg_match('/^DB_CONNECTION=(\S+)/m', $env, $m)) {
-            $stack[] = match (trim($m[1])) {
-                'pgsql' => 'PostgreSQL',
-                'mysql' => 'MySQL',
-                'sqlite' => 'SQLite',
-                default => strtoupper(trim($m[1])),
-            };
+            if (str_starts_with($line, '-')) {
+                $hunkNewLines[] = substr($line, 1);
+            } elseif (str_starts_with($line, '+')) {
+                $hunkHasUserAdditions = true;
+            }
         }
 
-        if (
-            isset($require['predis/predis']) ||
-            isset($require['illuminate/redis']) ||
-            ($env !== '' && str_contains($env, 'REDIS_HOST='))
-        ) {
-            $stack[] = 'Redis';
+        if ($inHunk && ! $hunkHasUserAdditions && $hunkNewLines !== []) {
+            $result = array_merge($result, $hunkNewLines);
         }
 
-        if ($stack !== []) {
-            $detected['[e.g. Laravel 13, PHP 8.5, PostgreSQL 16, Redis]'] = implode(', ', $stack);
-        }
-
-        return $detected;
-    }
-
-    /** @return array<string, string> */
-    private function detectCommands(string $targetPath): array
-    {
-        $composer = [];
-        $composerPath = $targetPath.'/composer.json';
-        if (file_exists($composerPath)) {
-            $composer = (array) (json_decode((string) file_get_contents($composerPath), true) ?? []);
-        }
-        $composerScripts = (array) ($composer['scripts'] ?? []);
-
-        $package = [];
-        $packagePath = $targetPath.'/package.json';
-        if (file_exists($packagePath)) {
-            $package = (array) (json_decode((string) file_get_contents($packagePath), true) ?? []);
-        }
-        $packageScripts = (array) ($package['scripts'] ?? []);
-
-        $detected = [];
-
-        // Test command
-        if (isset($composerScripts['test'])) {
-            $detected['[TEST COMMAND]'] = 'composer test';
-        } elseif (file_exists($targetPath.'/vendor/bin/pest')) {
-            $detected['[TEST COMMAND]'] = './vendor/bin/pest';
-        } elseif (file_exists($targetPath.'/vendor/bin/phpunit')) {
-            $detected['[TEST COMMAND]'] = './vendor/bin/phpunit';
-        } else {
-            $detected['[TEST COMMAND]'] = 'php artisan test';
-        }
-
-        // Static analysis
-        if (isset($composerScripts['analyse'])) {
-            $detected['[STATIC ANALYSIS COMMAND]'] = 'composer analyse';
-        } elseif (isset($composerScripts['analyze'])) {
-            $detected['[STATIC ANALYSIS COMMAND]'] = 'composer analyze';
-        } elseif (file_exists($targetPath.'/vendor/bin/phpstan')) {
-            $detected['[STATIC ANALYSIS COMMAND]'] = './vendor/bin/phpstan analyse';
-        }
-
-        // Start services
-        if (file_exists($targetPath.'/docker-compose.yml') || file_exists($targetPath.'/docker-compose.yaml')) {
-            $detected['[START COMMAND]'] = './vendor/bin/sail up -d';
-        } else {
-            $detected['[START COMMAND]'] = 'php artisan serve';
-        }
-
-        // Build
-        if (isset($packageScripts['build'])) {
-            $manager = match (true) {
-                file_exists($targetPath.'/bun.lockb') => 'bun',
-                file_exists($targetPath.'/yarn.lock') => 'yarn',
-                default => 'npm',
-            };
-            $detected['[BUILD COMMAND]'] = "{$manager} run build";
-        }
-
-        return $detected;
+        return implode("\n", $result);
     }
 }

@@ -3,12 +3,13 @@
 namespace larablocks\MapAi\Commands;
 
 use Illuminate\Console\Command;
+use larablocks\MapAi\Commands\Concerns\ProcessesStubContent;
 use larablocks\MapAi\Commands\Concerns\RendersDiff;
 use larablocks\MapAi\Installer;
 
 class DiffCommand extends Command
 {
-    use RendersDiff;
+    use ProcessesStubContent, RendersDiff;
 
     protected $signature = 'map:diff {file? : Specific scaffold file to diff (e.g. AGENTS.md)}';
 
@@ -47,7 +48,9 @@ class DiffCommand extends Command
                 continue;
             }
 
-            if (file_get_contents($stub) === file_get_contents($project)) {
+            $effectiveContent = $this->processStubContent($relPath, (string) file_get_contents($stub), $targetPath);
+
+            if ($effectiveContent === file_get_contents($project)) {
                 $this->line("  <fg=gray>[IDENTICAL]</>     {$relPath}");
                 $identical++;
 
@@ -56,7 +59,7 @@ class DiffCommand extends Command
 
             $this->line("  <fg=blue>[MODIFIED]</>      {$relPath}");
             $this->newLine();
-            $this->showDiff($stub, $project);
+            $this->showDiffFromContent($effectiveContent, $project);
             $this->newLine();
             $modified++;
         }

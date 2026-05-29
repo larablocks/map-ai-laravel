@@ -32,7 +32,6 @@ it('skips scaffold files without --force', function () {
 
     $this->artisan('map:install')
         ->expectsOutputToContain('[SKIP]')
-        ->expectsConfirmation('Apply stub changes to AGENTS.md?', 'no')
         ->assertSuccessful();
 
     expect(file_get_contents($agentsPath))->toBe('custom content');
@@ -283,37 +282,53 @@ it('does not copy shared.md as a personal file', function () {
     expect(file_exists($this->tempDir.'/docs/memory/shared.md'))->toBeFalse();
 });
 
-it('shows diff and prompts for each out-of-date scaffold file', function () {
-    file_put_contents($this->tempDir.'/AGENTS.md', 'custom content');
+it('shows [NO NEW CONTENT] when all differences are user customisations', function () {
+    $stubContent = (string) file_get_contents(\larablocks\MapAi\Installer::stubsPath().'/CLAUDE.md');
+    file_put_contents($this->tempDir.'/CLAUDE.md', $stubContent."\n\n## My Custom Section\n\nCustom content here.");
+
+    $this->artisan('map:install')
+        ->assertSuccessful()
+        ->expectsOutputToContain('[NO NEW CONTENT]');
+});
+
+it('shows diff and prompts to append when stub has new content missing from project', function () {
+    $stubContent = (string) file_get_contents(\larablocks\MapAi\Installer::stubsPath().'/CLAUDE.md');
+    $truncated = implode("\n", array_slice(explode("\n", $stubContent), 0, 3))."\n";
+    file_put_contents($this->tempDir.'/CLAUDE.md', $truncated);
 
     $this->artisan('map:install')
         ->expectsOutputToContain('[MODIFIED]')
-        ->expectsConfirmation('Apply stub changes to AGENTS.md?', 'no')
+        ->expectsConfirmation('Append new stub content to CLAUDE.md?', 'no')
         ->assertSuccessful();
 });
 
-it('applies stub changes and creates a backup when user confirms', function () {
-    file_put_contents($this->tempDir.'/AGENTS.md', 'custom content');
+it('appends new stub content and creates a backup when user confirms', function () {
+    $stubContent = (string) file_get_contents(\larablocks\MapAi\Installer::stubsPath().'/CLAUDE.md');
+    $truncated = implode("\n", array_slice(explode("\n", $stubContent), 0, 3))."\n";
+    file_put_contents($this->tempDir.'/CLAUDE.md', $truncated);
 
     $this->artisan('map:install')
-        ->expectsConfirmation('Apply stub changes to AGENTS.md?', 'yes')
-        ->assertSuccessful();
-
-    expect(file_get_contents($this->tempDir.'/AGENTS.md'))->not->toBe('custom content');
-    expect(file_exists($this->tempDir.'/AGENTS.md.bak'))->toBeTrue();
-    expect(file_get_contents($this->tempDir.'/AGENTS.md.bak'))->toBe('custom content');
-});
-
-it('keeps the existing file when user declines stub changes', function () {
-    file_put_contents($this->tempDir.'/AGENTS.md', 'custom content');
-
-    $this->artisan('map:install')
-        ->expectsConfirmation('Apply stub changes to AGENTS.md?', 'no')
+        ->expectsConfirmation('Append new stub content to CLAUDE.md?', 'yes')
         ->assertSuccessful()
-        ->expectsOutputToContain('[KEPT]');
+        ->expectsOutputToContain('[UPDATED]');
 
-    expect(file_get_contents($this->tempDir.'/AGENTS.md'))->toBe('custom content');
-    expect(file_exists($this->tempDir.'/AGENTS.md.bak'))->toBeFalse();
+    expect(strlen((string) file_get_contents($this->tempDir.'/CLAUDE.md')))->toBeGreaterThan(strlen($truncated));
+    expect(file_exists($this->tempDir.'/CLAUDE.md.bak'))->toBeTrue();
+    expect(file_get_contents($this->tempDir.'/CLAUDE.md.bak'))->toBe($truncated);
+});
+
+it('does not modify the file when user declines appending stub content', function () {
+    $stubContent = (string) file_get_contents(\larablocks\MapAi\Installer::stubsPath().'/CLAUDE.md');
+    $truncated = implode("\n", array_slice(explode("\n", $stubContent), 0, 3))."\n";
+    file_put_contents($this->tempDir.'/CLAUDE.md', $truncated);
+
+    $this->artisan('map:install')
+        ->expectsConfirmation('Append new stub content to CLAUDE.md?', 'no')
+        ->assertSuccessful()
+        ->expectsOutputToContain('[SKIPPED]');
+
+    expect(file_get_contents($this->tempDir.'/CLAUDE.md'))->toBe($truncated);
+    expect(file_exists($this->tempDir.'/CLAUDE.md.bak'))->toBeFalse();
 });
 
 it('does not duplicate gitignore entries on re-install', function () {

@@ -20,8 +20,8 @@ it('reports not installed for scaffold files that do not exist', function () {
 });
 
 it('reports identical for scaffold files matching the stub', function () {
-    $stubContent = file_get_contents(Installer::stubsPath().'/AGENTS.md');
-    file_put_contents($this->tempDir.'/AGENTS.md', $stubContent);
+    $stubContent = file_get_contents(Installer::stubsPath().'/CLAUDE.md');
+    file_put_contents($this->tempDir.'/CLAUDE.md', $stubContent);
 
     $this->artisan('map:diff')
         ->assertSuccessful()
@@ -56,8 +56,8 @@ it('returns failure for an unrecognised file argument', function () {
 });
 
 it('shows a summary line with counts', function () {
-    $stubContent = file_get_contents(Installer::stubsPath().'/AGENTS.md');
-    file_put_contents($this->tempDir.'/AGENTS.md', $stubContent);
+    $stubContent = file_get_contents(Installer::stubsPath().'/CLAUDE.md');
+    file_put_contents($this->tempDir.'/CLAUDE.md', $stubContent);
 
     $this->artisan('map:diff')
         ->assertSuccessful()

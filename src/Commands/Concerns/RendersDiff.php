@@ -6,7 +6,8 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
 
 trait RendersDiff
 {
-    private function showDiff(string $stub, string $project): void
+    /** Run diff, display it coloured, and return the raw diff string for further processing. */
+    private function showDiff(string $stub, string $project): string
     {
         $proc = proc_open(
             ['diff', '-u', '--label', 'stub', '--label', 'project/'.basename($project), $stub, $project],
@@ -17,7 +18,7 @@ trait RendersDiff
         if (! is_resource($proc)) {
             $this->line('    (diff unavailable — files differ)');
 
-            return;
+            return '';
         }
 
         $output = stream_get_contents($pipes[1]);
@@ -25,7 +26,30 @@ trait RendersDiff
         fclose($pipes[2]);
         proc_close($proc);
 
-        foreach (explode("\n", rtrim((string) $output)) as $line) {
+        $this->renderDiff((string) $output);
+
+        return (string) $output;
+    }
+
+    /**
+     * Write $content to a temp file, diff it against $project, display, and return the diff string.
+     * Useful for diffing against effective (placeholder-substituted) stub content.
+     */
+    private function showDiffFromContent(string $content, string $project): string
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'map-stub-');
+        file_put_contents($tmp, $content);
+
+        try {
+            return $this->showDiff($tmp, $project);
+        } finally {
+            unlink($tmp);
+        }
+    }
+
+    private function renderDiff(string $diff): void
+    {
+        foreach (explode("\n", rtrim($diff)) as $line) {
             $escaped = OutputFormatter::escape($line);
             if (str_starts_with($line, '---') || str_starts_with($line, '+++')) {
                 $this->line("    <fg=white>{$escaped}</>");
