@@ -137,18 +137,21 @@ class InstallCommand extends Command
 
                 $effectiveContent = $this->processStubContent($file, (string) file_get_contents($stub), $targetPath);
 
+                $existing = (string) file_get_contents($project);
+                $diff = $this->computeDiffFromContent($effectiveContent, $project);
+                $newContent = $this->extractNewStubContent($diff);
+
+                if (trim($newContent) === '' || str_contains($existing, trim($newContent))) {
+                    continue;
+                }
+
                 $this->newLine();
                 $this->line("  <fg=blue>[MODIFIED]</>  {$file}");
                 $this->newLine();
-                $diff = $this->showDiffFromContent($effectiveContent, $project);
+                $this->showDiffFromContent($effectiveContent, $project);
                 $this->newLine();
 
-                $newContent = $this->extractNewStubContent($diff);
-
-                if (trim($newContent) === '') {
-                    $this->line("  <fg=gray>[NO NEW CONTENT]</>  All differences are your customisations — nothing to apply automatically.");
-                } elseif ($this->confirm("Append new stub content to {$file}?", true)) {
-                    $existing = (string) file_get_contents($project);
+                if ($this->confirm("Append new stub content to {$file}?", true)) {
                     copy($project, $project.'.bak');
                     file_put_contents($project, rtrim($existing)."\n\n".$newContent."\n");
                     $this->line("  <fg=green>[UPDATED]</>   {$file}  (new content appended, original saved as {$file}.bak)");

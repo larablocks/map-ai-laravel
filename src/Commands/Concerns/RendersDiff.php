@@ -47,6 +47,34 @@ trait RendersDiff
         }
     }
 
+    /** Compute diff without rendering — returns the raw diff string. */
+    private function computeDiffFromContent(string $content, string $project): string
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'map-stub-');
+        file_put_contents($tmp, $content);
+
+        try {
+            $proc = proc_open(
+                ['diff', '-u', '--label', 'stub', '--label', 'project/'.basename($project), $tmp, $project],
+                [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $pipes,
+            );
+
+            if (! is_resource($proc)) {
+                return '';
+            }
+
+            $output = stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            proc_close($proc);
+
+            return (string) $output;
+        } finally {
+            unlink($tmp);
+        }
+    }
+
     private function renderDiff(string $diff): void
     {
         foreach (explode("\n", rtrim($diff)) as $line) {
