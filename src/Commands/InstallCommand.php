@@ -127,34 +127,39 @@ class InstallCommand extends Command
         ));
 
         if ($outOfDate !== []) {
-            $count = count($outOfDate);
             $this->newLine();
-            $this->line("Reviewing {$count} scaffold file(s) with stub updates...");
+            $this->line('Checking for new stub content...');
 
             foreach ($outOfDate as $file) {
                 $stub = Installer::stubsPath().'/'.$file;
                 $project = $targetPath.'/'.$file;
+                $existing = (string) file_get_contents($project);
 
                 $effectiveContent = $this->processStubContent($file, (string) file_get_contents($stub), $targetPath);
 
-                $existing = (string) file_get_contents($project);
-                $diff = $this->computeDiffFromContent($effectiveContent, $project);
-                $newContent = $this->extractNewStubContent($diff);
+                $diff = $this->diffProjectToStub($project, $effectiveContent);
+                $additionHunks = $this->extractAdditionHunks($diff);
 
-                if (trim($newContent) === '' || str_contains($existing, trim($newContent))) {
+                if ($additionHunks === []) {
+                    continue;
+                }
+
+                $newLines = $this->newLinesFromHunks($additionHunks);
+
+                if ($newLines === [] || str_contains($existing, implode("\n", $newLines))) {
                     continue;
                 }
 
                 $this->newLine();
-                $this->line("  <fg=blue>[MODIFIED]</>  {$file}");
+                $this->line("  <fg=blue>[NEW CONTENT]</>  {$file}");
                 $this->newLine();
-                $this->showDiffFromContent($effectiveContent, $project);
+                $this->renderAdditionHunks($additionHunks);
                 $this->newLine();
 
-                if ($this->confirm("Append new stub content to {$file}?", true)) {
+                if ($this->confirm("Insert new stub content into {$file}?", true)) {
                     copy($project, $project.'.bak');
-                    file_put_contents($project, rtrim($existing)."\n\n".$newContent."\n");
-                    $this->line("  <fg=green>[UPDATED]</>   {$file}  (new content appended, original saved as {$file}.bak)");
+                    $this->applyHunkInsertions($project, $additionHunks);
+                    $this->line("  <fg=green>[UPDATED]</>   {$file}  (inserted in-place, original saved as {$file}.bak)");
                 } else {
                     $this->line("  <fg=yellow>[SKIPPED]</>   {$file}");
                 }
@@ -220,52 +225,5 @@ class InstallCommand extends Command
                 $this->line("  <fg=yellow>[MANUAL]</>    {$label}: fill in manually");
             }
         }
-    }
-
-    /**
-     * Parse a unified diff (stub vs project) and extract lines that are in the stub
-     * but completely absent from the project with no conflicting user content in the same hunk.
-     * Hunks that mix stub additions with user additions are skipped — those are areas
-     * the user has customised and should not be touched automatically.
-     */
-    private function extractNewStubContent(string $diff): string
-    {
-        $lines = explode("\n", $diff);
-        $inHunk = false;
-        $hunkNewLines = [];
-        $hunkHasUserAdditions = false;
-        $result = [];
-
-        foreach ($lines as $line) {
-            if (str_starts_with($line, '@@')) {
-                if ($inHunk && ! $hunkHasUserAdditions && $hunkNewLines !== []) {
-                    $result = array_merge($result, $hunkNewLines);
-                }
-                $inHunk = true;
-                $hunkNewLines = [];
-                $hunkHasUserAdditions = false;
-                continue;
-            }
-
-            if (str_starts_with($line, '---') || str_starts_with($line, '+++')) {
-                continue;
-            }
-
-            if (! $inHunk) {
-                continue;
-            }
-
-            if (str_starts_with($line, '-')) {
-                $hunkNewLines[] = substr($line, 1);
-            } elseif (str_starts_with($line, '+')) {
-                $hunkHasUserAdditions = true;
-            }
-        }
-
-        if ($inHunk && ! $hunkHasUserAdditions && $hunkNewLines !== []) {
-            $result = array_merge($result, $hunkNewLines);
-        }
-
-        return implode("\n", $result);
     }
 }
