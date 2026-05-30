@@ -123,10 +123,11 @@ php artisan map:install --force
 | `docs/SCHEMA.md` | Database schema and service contracts (AI-maintained) |
 | `docs/GLOSSARY.md` | Domain terms and abbreviations |
 | `docs/DOCKER.md` | Container and environment reference |
+| `docs/FEATURE_FLAGS.md` | Feature flag registry (AI-maintained) |
 | `docs/SETUP.md` | Local dev setup for new developers |
 | `docs/TESTING_COVERAGE.md` | Coverage tracking — updated from actual output |
 | `docs/MEMORY.example.md` | Memory index template (copy to `MEMORY.md` — gitignored) |
-| `docs/memory/*.example.md` | Per-topic memory templates: framework, database, testing, environment, agents, shared |
+| `docs/memory/*.example.md` | Per-topic memory templates: framework, database, testing, environment, performance, agents, shared |
 | `docs/agents/agent.example.md` | Template for documenting a specific agent |
 | `docs/api/api.example.md` | Template for documenting an API |
 | `docs/integrations/integration.example.md` | Template for documenting an integration |
