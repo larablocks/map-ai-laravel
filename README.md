@@ -10,10 +10,6 @@ Without it, each AI session starts from zero. With it, sessions start informed.
 
 ## What you gain
 
-### Sessions pick up where they left off
-
-`HANDOFF.md` captures the exact state at session end: what was in progress, what's broken, what to do next. Start a new session with "continue" and the AI reads it and resumes without re-explanation. No more spending the first ten minutes re-establishing context.
-
 ### The AI remembers what it learned
 
 `docs/memory/` files accumulate project-specific knowledge across sessions — gotchas, database quirks, testing patterns, environment surprises. The AI reads these at startup and doesn't repeat mistakes it's already made on your project.
@@ -65,9 +61,7 @@ MAP defines a set of **write rules** — declarative triggers built into `AGENTS
 
 Writes happen immediately — not deferred to session end, not optional. When the AI finds a bug mid-task, it appends to `BUGS.md` before continuing. When it makes an architectural call, it records the decision and reasoning before moving on. The priority order is fixed: `BUGS.md` first, `ARCHITECTURE_HISTORY.md` second, everything else after.
 
-`HANDOFF.md` is rewritten at two specific moments: when a task completes or a blocker is discovered, and when the context window approaches 70% capacity. At the context limit the AI rewrites `HANDOFF.md` and compacts — so even a session cut short by a context reset leaves a clean handoff for the next session to continue from.
-
-At session end the AI runs a closing ritual: rewrite `HANDOFF.md`, update `docs/STATUS.md` with current project health, and route everything learned during the session to the appropriate `docs/memory/` file.
+At session end the AI updates `docs/STATUS.md` with current project health and routes everything learned during the session to the appropriate `docs/memory/` file.
 
 The result is documentation that reflects what is actually true about the project right now — maintained continuously as a side effect of development work, not as a separate task someone needs to remember to do.
 
@@ -75,15 +69,13 @@ The result is documentation that reflects what is actually true about the projec
 
 ## Designed for lean context
 
-Every file in MAP has a size ceiling enforced by the AI's own write rules. `AGENTS.md` stays under 90 lines. `HANDOFF.md` stays under 40. `docs/memory/gotchas.md` caps at 10 entries. Memory topic files cap at 50. When a file fills up, the AI summarises or removes before adding — so files stay dense and high-signal rather than growing without bound.
+Every file in MAP has a size ceiling enforced by the AI's own write rules. `AGENTS.md` stays under 100 lines. `docs/memory/gotchas.md` caps at 10 entries. Memory topic files cap at 50. When a file fills up, the AI summarises or removes before adding — so files stay dense and high-signal rather than growing without bound.
 
 Beyond size caps, the structure itself controls what gets loaded:
 
 **Selective loading, not full context at startup.** `AGENTS.md`'s "Load when relevant" section tells the AI which files to read for which tasks. A session fixing a bug doesn't load `ARCHITECTURE.md` or `SCHEMA.md`. A session touching the database doesn't load `DOCKER.md`. Files are pulled on demand.
 
 **Index before content.** `MEMORY.md` is a one-page index — a table of topic files and entry counts. The AI reads it first to know what knowledge exists, then loads only the topic file relevant to the current task. `docs/memory/database.md` is never loaded during a UI fix.
-
-**Session branching eliminates waste.** The startup ritual has two explicit paths: fresh start and continuation. In a fresh start, `HANDOFF.md` is skipped entirely. In a continuation, only `HANDOFF.md` and a small set of status files are read before work begins. The AI doesn't load everything — it loads what the session type requires.
 
 **History separated from current state.** `ARCHITECTURE_HISTORY.md` grows large over time; `ARCHITECTURE.md` stays a concise snapshot of current structure. You pay for historical decision tokens only when a decision is actively being revisited.
 
@@ -118,8 +110,6 @@ php artisan map:install --force
 | `AGENTS.md` | Primary AI entry point — project name, stack, session rituals, write rules |
 | `CLAUDE.md` | Claude Code entry point — imports AGENTS.md, adds Claude-specific config |
 | `GEMINI.md` | Gemini CLI entry point |
-| `HANDOFF.example.md` | Session handoff template (copy to `HANDOFF.md` — gitignored per-developer) |
-| `CLAUDE.local.example.md` | Personal Claude overrides template (copy to `CLAUDE.local.md` — gitignored) |
 | `.claude/rules/security.md` | Security rules — auto-loaded every Claude Code session |
 | `.claude/rules/testing.md` | Coverage and test quality rules — auto-loaded every Claude Code session |
 | `.github/copilot-instructions.md` | Copilot entry point — AGENTS.md content inlined |
@@ -154,7 +144,6 @@ The installer merges these entries into your `.gitignore` (skipped if already pr
 
 ```gitignore
 # MAP — developer-specific files (do not commit)
-HANDOFF.md
 .claude/settings.local.json
 CLAUDE.local.md
 docs/MEMORY.md
