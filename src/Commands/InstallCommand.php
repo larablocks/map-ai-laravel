@@ -141,22 +141,24 @@ class InstallCommand extends Command
                 $additionHunks = $this->extractAdditionHunks($diff);
 
                 if ($additionHunks === []) {
+                    $this->line("  <fg=gray>[NO NEW CONTENT]</> {$file}");
                     continue;
                 }
 
                 $newLines = $this->newLinesFromHunks($additionHunks);
 
                 if ($newLines === [] || str_contains($existing, implode("\n", $newLines))) {
+                    $this->line("  <fg=gray>[NO NEW CONTENT]</> {$file}");
                     continue;
                 }
 
                 $this->newLine();
-                $this->line("  <fg=blue>[NEW CONTENT]</>  {$file}");
+                $this->line("  <fg=blue>[MODIFIED]</>    {$file}");
                 $this->newLine();
                 $this->renderAdditionHunks($additionHunks);
                 $this->newLine();
 
-                if ($this->confirm("Insert new stub content into {$file}?", true)) {
+                if ($this->confirm("Append new stub content to {$file}?", true)) {
                     copy($project, $project.'.bak');
                     $this->applyHunkInsertions($project, $additionHunks);
                     $this->line("  <fg=green>[UPDATED]</>   {$file}  (inserted in-place, original saved as {$file}.bak)");

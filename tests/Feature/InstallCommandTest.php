@@ -82,7 +82,6 @@ it('appends map entries to an empty gitignore', function () {
     $gitignore = file_get_contents($this->tempDir.'/.gitignore');
 
     expect($gitignore)
-        ->toContain('HANDOFF.md')
         ->toContain('.claude/settings.local.json')
         ->toContain('CLAUDE.local.md')
         ->toContain('docs/MEMORY.md')
@@ -101,7 +100,7 @@ it('appends map entries after existing gitignore content', function () {
 
     expect($gitignore)
         ->toStartWith($existing)
-        ->toContain('HANDOFF.md');
+        ->toContain('.claude/settings.local.json');
 });
 
 it('stamps today\'s date into AGENTS.md on install', function () {
@@ -256,14 +255,13 @@ it('detects redis from .env.example and writes to AGENTS.md', function () {
 it('bootstraps personal files from example stubs on install', function () {
     $this->artisan('map:install')->assertSuccessful();
 
-    expect(file_exists($this->tempDir.'/HANDOFF.md'))->toBeTrue();
-    expect(file_exists($this->tempDir.'/CLAUDE.local.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/MEMORY.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/gotchas.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/framework.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/database.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/testing.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/environment.md'))->toBeTrue();
+    expect(file_exists($this->tempDir.'/docs/memory/performance.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/agents.md'))->toBeTrue();
 });
 
@@ -340,5 +338,5 @@ it('does not duplicate gitignore entries on re-install', function () {
 
     $gitignore = file_get_contents($this->tempDir.'/.gitignore');
 
-    expect(substr_count($gitignore, 'HANDOFF.md'))->toBe(1);
+    expect(substr_count($gitignore, '.claude/settings.local.json'))->toBe(1);
 });

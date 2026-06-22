@@ -131,13 +131,15 @@ php artisan map:install --force
 | `docs/agents/agent.example.md` | Template for documenting a specific agent |
 | `docs/api/api.example.md` | Template for documenting an API |
 | `docs/integrations/integration.example.md` | Template for documenting an integration |
+| `docs/architecture/architecture.example.md` | Template for documenting a subsystem or component |
+| `docs/qa/qa.example.md` | Template for a completed-feature QA record |
 
 ## After installation
 
-1. Edit `AGENTS.md` line 2 — set your project name and stack
-2. Edit `AGENTS.md` line 3 — set today's date
-3. Fill in the Commands section of `AGENTS.md` (test, build, start commands)
-4. Each developer runs the `cp` commands in `docs/SETUP.md` step 3 to initialize their personal gitignored files
+The installer auto-detects your project name, stack, and common commands from `composer.json`, `package.json`, and `.env.example`. Review `AGENTS.md` after install — anything it couldn't detect will still show a `[...]` placeholder for you to fill in manually.
+
+1. Review `AGENTS.md` — verify auto-detected values on lines 2–3 and the Commands section; fill in any remaining `[...]` placeholders
+2. Each developer runs the `cp` commands in `docs/SETUP.md` step 3 to initialize their personal gitignored files
 
 ## .gitignore entries added
 
