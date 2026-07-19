@@ -3,13 +3,13 @@
 namespace larablocks\MapAi\Commands;
 
 use Illuminate\Console\Command;
-use larablocks\MapAi\Commands\Concerns\ProcessesStubContent;
 use larablocks\MapAi\Commands\Concerns\RendersDiff;
+use larablocks\MapAi\Doctor;
 use larablocks\MapAi\Installer;
 
 class DiffCommand extends Command
 {
-    use ProcessesStubContent, RendersDiff;
+    use RendersDiff;
 
     protected $signature = 'map:diff {file? : Specific scaffold file to diff (e.g. AGENTS.md)}';
 
@@ -30,6 +30,14 @@ class DiffCommand extends Command
 
         $files = $file !== null ? [$file] : Installer::SCAFFOLD_FILES;
 
+        // Reuses map-ai's own classification instead of re-diffing to decide what's
+        // safe to patch in automatically vs what needs a human — see InstallCommand's
+        // use of the same call for actually applying the fixable half.
+        $findingsByFile = [];
+        foreach ((new Doctor)->check($stubsPath, $targetPath) as $finding) {
+            $findingsByFile[$finding['file']][] = $finding['id'];
+        }
+
         $this->line('Diffing scaffold files against stubs...');
         $this->newLine();
 
@@ -48,18 +56,23 @@ class DiffCommand extends Command
                 continue;
             }
 
-            $effectiveContent = $this->processStubContent($relPath, (string) file_get_contents($stub), $targetPath);
-
-            if ($effectiveContent === file_get_contents($project)) {
+            if (file_get_contents($stub) === file_get_contents($project)) {
                 $this->line("  <fg=gray>[IDENTICAL]</>     {$relPath}");
                 $identical++;
 
                 continue;
             }
 
-            $this->line("  <fg=blue>[MODIFIED]</>      {$relPath}");
+            $ids = $findingsByFile[$relPath] ?? [];
+            $annotation = match (true) {
+                in_array('missing-template-updates', $ids, true) => ' (has safe template updates — run map:install to apply)',
+                in_array('outdated-scaffold-file', $ids, true) => ' (needs a manual merge — not safe to auto-apply)',
+                default => '',
+            };
+
+            $this->line("  <fg=blue>[MODIFIED]</>      {$relPath}{$annotation}");
             $this->newLine();
-            $this->showDiffFromContent($effectiveContent, $project);
+            $this->showDiff($stub, $project);
             $this->newLine();
             $modified++;
         }

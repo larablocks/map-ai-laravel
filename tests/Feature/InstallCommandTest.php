@@ -38,23 +38,23 @@ it('skips scaffold files without --force', function () {
 });
 
 it('updates managed files without --force', function () {
-    mkdir($this->tempDir.'/.claude/rules', 0755, true);
-    file_put_contents($this->tempDir.'/.claude/rules/security.md', 'old content');
+    mkdir($this->tempDir.'/.cursor/rules', 0755, true);
+    file_put_contents($this->tempDir.'/.cursor/rules/agents.mdc', 'old content');
 
     $this->artisan('map:install')
         ->assertSuccessful()
         ->expectsOutputToContain('[UPDATE]');
 
-    expect(file_get_contents($this->tempDir.'/.claude/rules/security.md'))->not->toBe('old content');
+    expect(file_get_contents($this->tempDir.'/.cursor/rules/agents.mdc'))->not->toBe('old content');
 });
 
 it('does not create a backup when updating managed files', function () {
-    mkdir($this->tempDir.'/.claude/rules', 0755, true);
-    file_put_contents($this->tempDir.'/.claude/rules/security.md', 'old content');
+    mkdir($this->tempDir.'/.cursor/rules', 0755, true);
+    file_put_contents($this->tempDir.'/.cursor/rules/agents.mdc', 'old content');
 
     $this->artisan('map:install')->assertSuccessful();
 
-    expect(file_exists($this->tempDir.'/.claude/rules/security.md.bak'))->toBeFalse();
+    expect(file_exists($this->tempDir.'/.cursor/rules/agents.mdc.bak'))->toBeFalse();
 });
 
 it('overwrites existing files with --force', function () {
@@ -257,12 +257,17 @@ it('bootstraps personal files from example stubs on install', function () {
 
     expect(file_exists($this->tempDir.'/docs/MEMORY.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/gotchas.md'))->toBeTrue();
-    expect(file_exists($this->tempDir.'/docs/memory/framework.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/database.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/testing.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/environment.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/performance.md'))->toBeTrue();
     expect(file_exists($this->tempDir.'/docs/memory/agents.md'))->toBeTrue();
+});
+
+it('does not bootstrap docs/memory/framework.md — it needs a project-specific rename first', function () {
+    $this->artisan('map:install')->assertSuccessful();
+
+    expect(file_exists($this->tempDir.'/docs/memory/framework.md'))->toBeFalse();
 });
 
 it('does not overwrite existing personal files on re-install', function () {

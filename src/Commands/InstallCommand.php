@@ -5,6 +5,7 @@ namespace larablocks\MapAi\Commands;
 use Illuminate\Console\Command;
 use larablocks\MapAi\Commands\Concerns\ProcessesStubContent;
 use larablocks\MapAi\Commands\Concerns\RendersDiff;
+use larablocks\MapAi\Doctor;
 use larablocks\MapAi\Installer;
 
 class InstallCommand extends Command
@@ -121,47 +122,46 @@ class InstallCommand extends Command
             'file'
         );
 
-        $outOfDate = array_values(array_filter(
-            $skippedFiles,
-            fn (string $file) => file_get_contents(Installer::stubsPath().'/'.$file) !== file_get_contents($targetPath.'/'.$file)
-        ));
+        $doctor = new Doctor;
+        $findingsByFile = [];
+        foreach ($doctor->check(Installer::stubsPath(), $targetPath) as $finding) {
+            $findingsByFile[$finding['file']][] = $finding;
+        }
 
-        if ($outOfDate !== []) {
+        if ($skippedFiles !== []) {
             $this->newLine();
             $this->line('Checking for new stub content...');
 
-            foreach ($outOfDate as $file) {
-                $stub = Installer::stubsPath().'/'.$file;
-                $project = $targetPath.'/'.$file;
-                $existing = (string) file_get_contents($project);
-
-                $effectiveContent = $this->processStubContent($file, (string) file_get_contents($stub), $targetPath);
-
-                $diff = $this->diffProjectToStub($project, $effectiveContent);
-                $additionHunks = $this->extractAdditionHunks($diff);
-
-                if ($additionHunks === []) {
-                    $this->line("  <fg=gray>[NO NEW CONTENT]</> {$file}");
-                    continue;
+            foreach ($skippedFiles as $file) {
+                if ($file === '.github/copilot-instructions.md') {
+                    continue; // handled separately below — regenerated, not diffed against a stub
                 }
 
-                $newLines = $this->newLinesFromHunks($additionHunks);
+                $stub = Installer::stubsPath().'/'.$file;
+                $project = $targetPath.'/'.$file;
 
-                if ($newLines === [] || str_contains($existing, implode("\n", $newLines))) {
-                    $this->line("  <fg=gray>[NO NEW CONTENT]</> {$file}");
+                $hunks = $doctor->fixableHunks($project, $stub);
+
+                if ($hunks === []) {
+                    $ids = array_column($findingsByFile[$file] ?? [], 'id');
+                    $label = in_array('outdated-scaffold-file', $ids, true)
+                        ? '<fg=yellow>[NEEDS REVIEW]</>  '
+                        : '<fg=gray>[NO NEW CONTENT]</>';
+                    $this->line("  {$label} {$file}");
+
                     continue;
                 }
 
                 $this->newLine();
                 $this->line("  <fg=blue>[MODIFIED]</>    {$file}");
                 $this->newLine();
-                $this->renderAdditionHunks($additionHunks);
+                $this->renderFixableHunks($project, $hunks);
                 $this->newLine();
 
                 if ($this->confirm("Append new stub content to {$file}?", true)) {
                     copy($project, $project.'.bak');
-                    $this->applyHunkInsertions($project, $additionHunks);
-                    $this->line("  <fg=green>[UPDATED]</>   {$file}  (inserted in-place, original saved as {$file}.bak)");
+                    $doctor->applyHunks($project, $hunks);
+                    $this->line("  <fg=green>[UPDATED]</>   {$file}  (patched in-place, original saved as {$file}.bak)");
                 } else {
                     $this->line("  <fg=yellow>[SKIPPED]</>   {$file}");
                 }
@@ -170,7 +170,46 @@ class InstallCommand extends Command
             $this->newLine();
         }
 
+        $this->syncCopilotInstructions($doctor, $targetPath);
+
         return self::SUCCESS;
+    }
+
+    /**
+     * Re-checks (rather than reusing the earlier $findingsByFile snapshot) because the
+     * scaffold-file loop above may just have patched AGENTS.md — copilot-instructions.md
+     * is regenerated from AGENTS.md/security.md/testing.md, so its sync state needs to
+     * reflect whatever those files look like now, not before the loop ran.
+     */
+    private function syncCopilotInstructions(Doctor $doctor, string $targetPath): void
+    {
+        $finding = null;
+        foreach ($doctor->check(Installer::stubsPath(), $targetPath) as $f) {
+            if ($f['id'] === 'copilot-out-of-sync') {
+                $finding = $f;
+                break;
+            }
+        }
+
+        if ($finding === null) {
+            return; // already in sync, or a source file (AGENTS.md/security.md/testing.md) is missing
+        }
+
+        if (! $finding['fixable']) {
+            $this->line("  <fg=yellow>[NEEDS REVIEW]</>  .github/copilot-instructions.md  ({$finding['message']})");
+
+            return;
+        }
+
+        $this->newLine();
+        $this->line('  <fg=blue>[OUT OF SYNC]</>   .github/copilot-instructions.md  (safe to regenerate from AGENTS.md/security.md/testing.md)');
+
+        if ($this->confirm('Regenerate .github/copilot-instructions.md?', true)) {
+            $doctor->fixCopilotSync($targetPath);
+            $this->line('  <fg=green>[UPDATED]</>   .github/copilot-instructions.md regenerated');
+        } else {
+            $this->line('  <fg=yellow>[SKIPPED]</>   .github/copilot-instructions.md');
+        }
     }
 
     /** @param list<array{action: string, file: string, backed_up: bool}> $files */
