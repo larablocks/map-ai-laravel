@@ -95,6 +95,18 @@ class InstallCommand extends Command
         }
 
         $this->newLine();
+        $this->line('Wiring Claude Code SessionStart hook...');
+
+        $claudeSettingsAction = $result['claudeSettings']['action'];
+        if (in_array($claudeSettingsAction, ['copy', 'update'], true)) {
+            $this->line('  <fg=green>[COPY]</>   .claude/settings.json — first-run check wired');
+        } elseif ($claudeSettingsAction === 'identical') {
+            $this->line('  <fg=gray>[SAME]</>   .claude/settings.json — already wired');
+        } elseif ($claudeSettingsAction === 'skip') {
+            $this->line('  <fg=yellow>[SKIP]</>   .claude/settings.json already exists — add the SessionStart hook manually (see vendor/larablocks/map-ai/stubs/.claude/settings.json for the block to merge in)');
+        }
+
+        $this->newLine();
         $this->line('Initializing personal files...');
         $this->newLine();
 

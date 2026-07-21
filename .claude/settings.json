@@ -7,7 +7,10 @@
             "Bash(composer analyse *)",
             "mcp__laravel-boost__database-schema",
             "mcp__laravel-boost__search-docs",
-            "mcp__laravel-boost__last-error"
+            "mcp__laravel-boost__last-error",
+            "mcp__laravel-boost__database-query",
+            "Bash(./vendor/bin/sail artisan test *)",
+            "Bash(./vendor/bin/sail php artisan test *)"
         ]
     }
 }

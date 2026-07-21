@@ -114,6 +114,8 @@ php artisan map:install --force
 | `.claude/rules/testing.md` | Coverage and test quality rules — auto-loaded every Claude Code session |
 | `.github/copilot-instructions.md` | Copilot entry point — AGENTS.md content inlined |
 | `.cursor/rules/agents.mdc` | Cursor entry point — imports AGENTS.md |
+| `.claude/hooks/map-first-run-check.sh` | Claude Code `SessionStart` hook — detects an un-initialized scaffold, see below |
+| `.claude/settings.json` | Wires the hook above (skipped, not overwritten, if you already have one — see below) |
 | `docs/STATUS.md` | Project health: build, tests, blockers, milestones |
 | `docs/BUGS.md` | Open bugs (AI-maintained) |
 | `docs/BUGS_ARCHIVE.md` | Fixed bugs — append-only |
@@ -133,6 +135,14 @@ php artisan map:install --force
 | `docs/integrations/integration.example.md` | Template for documenting an integration |
 | `docs/architecture/architecture.example.md` | Template for documenting a subsystem or component |
 | `docs/qa/qa.example.md` | Template for a completed-feature QA record |
+
+## First-run detection
+
+`map:install` only fills in the mechanical parts of `AGENTS.md` (project name, stack, commands, date) — it never invokes an AI. The deeper scaffold (`docs/STATUS.md`'s milestone, `docs/ARCHITECTURE.md`'s system overview, etc.) is left for whatever AI tool actually opens the project first.
+
+`AGENTS.md`'s Session start ritual (item 0) tells every supported tool — Claude Code, Gemini CLI, Copilot, Cursor — to check for those leftover placeholders and complete first-run init before doing anything else, including before responding to the developer's first message. That instruction alone works identically across all four tools since it's just markdown loaded into context.
+
+For Claude Code specifically, `.claude/hooks/map-first-run-check.sh` (wired via `.claude/settings.json`'s `SessionStart` hook) makes the same check deterministic: it greps for the placeholder markers and, if found, injects a directive into context so the check can't be silently skipped. It goes quiet on its own once real content replaces the placeholders — there's no separate "initialized" flag to maintain. If your project already has a `.claude/settings.json`, the installer won't touch it — wire the hook in yourself from `vendor/larablocks/map-ai/stubs/.claude/settings.json`.
 
 ## After installation
 
