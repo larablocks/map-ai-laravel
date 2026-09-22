@@ -183,8 +183,24 @@ class InstallCommand extends Command
         }
 
         $this->syncCopilotInstructions($doctor, $targetPath);
+        $this->reportReviewOnlyFindings($doctor, $targetPath);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Findings map-ai's Doctor reports but never fixes, and that aren't tied to a
+     * scaffold-file diff shown above — an AGENTS.md over its token cap, or an existing
+     * .claude/settings.json (copy-if-absent, so install never touched it) that doesn't
+     * register the token-check hook. Surfaced so they aren't silently missed.
+     */
+    private function reportReviewOnlyFindings(Doctor $doctor, string $targetPath): void
+    {
+        foreach ($doctor->check(Installer::stubsPath(), $targetPath) as $f) {
+            if (in_array($f['id'], ['agents-md-too-long', 'token-hook-not-registered'], true)) {
+                $this->line("  <fg=yellow>[NEEDS REVIEW]</>  {$f['file']}  ({$f['message']})");
+            }
+        }
     }
 
     /**

@@ -345,3 +345,31 @@ it('does not duplicate gitignore entries on re-install', function () {
 
     expect(substr_count($gitignore, '.claude/settings.local.json'))->toBe(1);
 });
+
+it('flags an existing settings.json that does not register the token hook', function () {
+    mkdir($this->tempDir.'/.claude', 0755, true);
+    file_put_contents($this->tempDir.'/.claude/settings.json', '{"hooks": {}}');
+
+    $this->artisan('map:install')
+        ->assertSuccessful()
+        ->expectsOutputToContain('[NEEDS REVIEW]  .claude/settings.json');
+
+    expect(file_get_contents($this->tempDir.'/.claude/settings.json'))->toBe('{"hooks": {}}');
+});
+
+it('installs settings.json with the token hook when none exists', function () {
+    $this->artisan('map:install')
+        ->assertSuccessful()
+        ->doesntExpectOutputToContain('token-hook-not-registered');
+
+    expect(file_get_contents($this->tempDir.'/.claude/settings.json'))->toContain('map-token-check.sh');
+    expect(file_exists($this->tempDir.'/.claude/hooks/map-token-check.sh'))->toBeTrue();
+});
+
+it('flags AGENTS.md over the token cap', function () {
+    file_put_contents($this->tempDir.'/AGENTS.md', str_repeat(str_repeat('x', 2000)."\n", 10));
+
+    $this->artisan('map:install')
+        ->assertSuccessful()
+        ->expectsOutputToContain('[NEEDS REVIEW]  AGENTS.md');
+});
