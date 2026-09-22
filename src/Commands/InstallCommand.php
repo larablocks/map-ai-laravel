@@ -99,12 +99,22 @@ class InstallCommand extends Command
 
         $claudeSettingsAction = $result['claudeSettings']['action'];
         if (in_array($claudeSettingsAction, ['copy', 'update'], true)) {
-            $this->line('  <fg=green>[COPY]</>   .claude/settings.json — first-run check wired');
+            $this->line('  <fg=green>[COPY]</>   .claude/settings.json — first-run check and token-cap hooks wired');
         } elseif ($claudeSettingsAction === 'identical') {
             $this->line('  <fg=gray>[SAME]</>   .claude/settings.json — already wired');
         } elseif ($claudeSettingsAction === 'skip') {
-            $this->line('  <fg=yellow>[SKIP]</>   .claude/settings.json already exists — add the SessionStart hook manually (see vendor/larablocks/map-ai/stubs/.claude/settings.json for the block to merge in)');
+            $this->line('  <fg=yellow>[SKIP]</>   .claude/settings.json already exists — add the MAP hooks manually (see vendor/larablocks/map-ai/stubs/.claude/settings.json for the blocks to merge in)');
         }
+
+        $this->newLine();
+        $this->line('Registering merge driver...');
+
+        match ($result['mergeDriver']) {
+            'updated' => $this->line('  <fg=green>[UPDATE]</> merge.map-ai — registered in .git/config'),
+            'skipped' => $this->line('  <fg=gray>[SAME]</>   merge.map-ai — already registered'),
+            'not-a-repo' => $this->line('  <fg=yellow>[SKIP]</>   merge.map-ai — not a git repository (run map:install again after git init)'),
+            default => $this->line('  <fg=yellow>[WARN]</>   merge.map-ai — could not write git config'),
+        };
 
         $this->newLine();
         $this->line('Initializing personal files...');

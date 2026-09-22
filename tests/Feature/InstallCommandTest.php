@@ -373,3 +373,19 @@ it('flags AGENTS.md over the token cap', function () {
         ->assertSuccessful()
         ->expectsOutputToContain('[NEEDS REVIEW]  AGENTS.md');
 });
+
+it('registers the merge driver when the project is a git repository', function () {
+    shell_exec('git -C '.escapeshellarg($this->tempDir).' init -q 2>&1');
+
+    $this->artisan('map:install')
+        ->assertSuccessful()
+        ->expectsOutputToContain('merge.map-ai — registered in .git/config');
+
+    expect(\larablocks\MapAi\Installer::mergeDriverRegistered($this->tempDir))->toBeTrue();
+});
+
+it('skips the merge driver outside a git repository', function () {
+    $this->artisan('map:install')
+        ->assertSuccessful()
+        ->expectsOutputToContain('merge.map-ai — not a git repository');
+});

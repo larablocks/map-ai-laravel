@@ -97,7 +97,7 @@ composer require larablocks/map-ai-laravel
 php artisan map:install
 ```
 
-This copies the MAP scaffold into your project root and merges the required entries into `.gitignore`. Files that already exist are skipped unless you pass `--force`.
+This copies the MAP scaffold into your project root, merges the required entries into `.gitignore` and `.gitattributes`, and registers MAP's markdown merge driver in `.git/config`. Files that already exist are skipped unless you pass `--force`.
 
 ```bash
 php artisan map:install --force
@@ -115,7 +115,9 @@ php artisan map:install --force
 | `.github/copilot-instructions.md` | Copilot entry point — AGENTS.md content inlined |
 | `.cursor/rules/agents.mdc` | Cursor entry point — imports AGENTS.md |
 | `.claude/hooks/map-first-run-check.sh` | Claude Code `SessionStart` hook — detects an un-initialized scaffold, see below |
-| `.claude/settings.json` | Wires the hook above (skipped, not overwritten, if you already have one — see below) |
+| `.claude/hooks/map-token-check.sh` | Claude Code `SessionStart`/`PostToolUse` hook — enforces the AGENTS.md and memory-file token caps |
+| `.claude/settings.json` | Wires the hooks above (skipped, not overwritten, if you already have one — see below) |
+| `.map/merge.sh` | Git merge driver for MAP docs — resolves appended entries, table rows, `Last updated` and duplicate `BUG-N` conflicts; leaves real conflicts to you |
 | `docs/STATUS.md` | Project health: build, tests, blockers, milestones |
 | `docs/BUGS.md` | Open bugs (AI-maintained) |
 | `docs/BUGS_ARCHIVE.md` | Fixed bugs — append-only |
@@ -150,6 +152,10 @@ The installer auto-detects your project name, stack, and common commands from `c
 
 1. Review `AGENTS.md` — verify auto-detected values on lines 2–3 and the Commands section; fill in any remaining `[...]` placeholders
 2. Each developer runs the `cp` commands in `docs/SETUP.md` step 3 to initialize their personal gitignored files
+
+## Merging MAP docs
+
+`.gitattributes` routes the Claude-maintained docs (`BUGS.md`, `ARCHITECTURE_HISTORY.md`, `STATUS.md`, `SCHEMA.md` and friends) to `.map/merge.sh`. It runs git's normal merge first and only steps in on conflict: entries both branches appended are both kept, table rows merge by their first cell, the newest `Last updated` wins, and a `BUG-N` both branches picked is renumbered. Anything else is left as a normal conflict. The driver registration lives in `.git/config`, which isn't cloned — `map:install` registers it, and so does the SessionStart hook on each clone's first Claude Code session. See the [map-ai README](https://github.com/larablocks/map-ai#merging-map-docs) for the full rules.
 
 ## .gitignore entries added
 
