@@ -54,7 +54,7 @@ MAP defines a set of **write rules** — declarative triggers built into `AGENTS
 | A new project-specific pattern | `docs/CODE_PATTERNS.md` — checked first to avoid duplication |
 | A new domain term or abbreviation | `docs/GLOSSARY.md` |
 | Surprising behaviour (framework, DB, tests, environment) | `docs/memory/[topic].md` — routed by subject |
-| Time wasted on a mistake | `docs/memory/gotchas.md` — capped at 10, least-actionable removed when full |
+| Time wasted on a mistake | `docs/memory/gotchas.md` — capped at ~750 tokens, least-actionable removed when full |
 | A schema change | `docs/SCHEMA.md` — updated immediately |
 | An architecture change | `docs/ARCHITECTURE.md` — updated to reflect current state |
 | Tests added or coverage run | `docs/TESTING_COVERAGE.md` — from actual output, never estimated |
@@ -69,7 +69,7 @@ The result is documentation that reflects what is actually true about the projec
 
 ## Designed for lean context
 
-Every file in MAP has a size ceiling enforced by the AI's own write rules. `AGENTS.md` stays under 100 lines. `docs/memory/gotchas.md` caps at 10 entries. Memory topic files cap at 50. When a file fills up, the AI summarises or removes before adding — so files stay dense and high-signal rather than growing without bound.
+Every working file in MAP has a size ceiling enforced by the AI's own write rules (the deliberate exceptions are the append-only logs — `ARCHITECTURE_HISTORY.md`, `BUGS_ARCHIVE.md`, and `METRICS_HISTORY.md` — which have no size limit and are never summarised). `AGENTS.md` stays under 3,000 tokens (estimated as bytes ÷ 4). `docs/memory/gotchas.md` caps at ~750 tokens and `docs/memory/shared.md` at ~1,500 (both load every session). Other memory topic files cap at ~2,500 tokens. In Claude Code, the `map-token-check.sh` hook enforces all of these. When a file fills up, the AI summarises or removes before adding — so files stay dense and high-signal rather than growing without bound.
 
 Beyond size caps, the structure itself controls what gets loaded:
 
