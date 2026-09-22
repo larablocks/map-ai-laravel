@@ -117,7 +117,8 @@ php artisan map:install --force
 | `.claude/hooks/map-first-run-check.sh` | Claude Code `SessionStart` hook — detects an un-initialized scaffold, see below |
 | `.claude/hooks/map-token-check.sh` | Claude Code `SessionStart`/`PostToolUse` hook — enforces the AGENTS.md and memory-file token caps |
 | `.claude/settings.json` | Wires the hooks above (skipped, not overwritten, if you already have one — see below) |
-| `.map/merge.sh` | Git merge driver for MAP docs — resolves appended entries, table rows, `Last updated` and duplicate `BUG-N` conflicts; leaves real conflicts to you |
+| `.map/merge.sh` | Git merge driver for MAP docs — rules first, then Claude for what's left; always stops for review when Claude was needed |
+| `.claude/skills/map-resolve/SKILL.md` | Claude Code skill to resolve and review MAP doc merge conflicts with you |
 | `docs/STATUS.md` | Project health: build, tests, blockers, milestones |
 | `docs/BUGS.md` | Open bugs (AI-maintained) |
 | `docs/BUGS_ARCHIVE.md` | Fixed bugs — append-only |
@@ -155,7 +156,9 @@ The installer auto-detects your project name, stack, and common commands from `c
 
 ## Merging MAP docs
 
-`.gitattributes` routes the Claude-maintained docs (`BUGS.md`, `ARCHITECTURE_HISTORY.md`, `STATUS.md`, `SCHEMA.md` and friends) to `.map/merge.sh`. It runs git's normal merge first and only steps in on conflict: entries both branches appended are both kept, table rows merge by their first cell, the newest `Last updated` wins, and a `BUG-N` both branches picked is renumbered. Anything else is left as a normal conflict. The driver registration lives in `.git/config`, which isn't cloned — `map:install` registers it, and so does the SessionStart hook on each clone's first Claude Code session. See the [map-ai README](https://github.com/larablocks/map-ai#merging-map-docs) for the full rules.
+`.gitattributes` routes every file an AI agent writes to (all of `docs/`, plus `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md` and `.claude/rules/`) to `.map/merge.sh`. The driver runs git's normal merge first. On conflict, deterministic rules resolve the usual cases: entries both branches appended, table rows, `Last updated`, and duplicate `BUG-N`s. Whatever is left goes to Claude (`claude -p`), and each resolution is checked before it's accepted.
+
+When Claude was needed, the merge always stops before committing so you can review `git diff` and `git add`. The `map-resolve` skill does the same review with you in a Claude Code session. The driver registration lives in `.git/config`, which isn't cloned: `map:install` registers it, and so does the SessionStart hook on each clone's first Claude Code session. See the [map-ai README](https://github.com/larablocks/map-ai#merging-map-docs) for the full rules and settings.
 
 ## .gitignore entries added
 
