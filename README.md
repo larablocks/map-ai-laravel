@@ -156,7 +156,7 @@ The installer auto-detects your project name, stack, and common commands from `c
 
 ## Merging MAP docs
 
-`.gitattributes` routes every file an AI agent writes to (all of `docs/`, plus `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md` and `.claude/rules/`) to `.map/merge.sh`. The driver runs git's normal merge first. On conflict, deterministic rules resolve the usual cases: entries both branches appended, table rows, `Last updated`, and duplicate `BUG-N`s. Whatever is left goes to Claude (`claude -p`), and each resolution is checked before it's accepted.
+`.gitattributes` routes every file an AI agent writes to (all of `docs/`, plus `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md` and `.claude/rules/`) to `.map/merge.sh`. The driver runs git's normal merge first. On conflict, deterministic rules resolve the usual cases: entries both branches appended, table rows, list items, `Last updated`, and duplicate `BUG-N`s. Sections of values re-measured every session (STATUS health and metrics, TESTING_COVERAGE) take the newer branch's numbers instead of stopping the merge. Whatever is left goes to Claude (`claude -p`), and each resolution is checked before it's accepted.
 
 When Claude was needed, the merge always stops before committing so you can review `git diff` and `git add`. The `map-resolve` skill does the same review with you in a Claude Code session. The driver registration lives in `.git/config`, which isn't cloned: `map:install` registers it, and so does the SessionStart hook on each clone's first Claude Code session. See the [map-ai README](https://github.com/larablocks/map-ai#merging-map-docs) for the full rules and settings.
 
