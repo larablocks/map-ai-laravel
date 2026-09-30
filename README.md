@@ -61,7 +61,7 @@ MAP defines a set of **write rules** — declarative triggers built into `AGENTS
 
 Writes happen immediately — not deferred to session end, not optional. When the AI finds a bug mid-task, it appends to `BUGS.md` before continuing. When it makes an architectural call, it records the decision and reasoning before moving on. The priority order is fixed: `BUGS.md` first, `ARCHITECTURE_HISTORY.md` second, everything else after.
 
-At session end the AI updates `docs/STATUS.md` with current project health and routes everything learned during the session to the appropriate `docs/memory/` file.
+At session end the AI updates `docs/STATUS.md` with current project health (moving older progress entries to `docs/STATUS_ARCHIVE.md`, since `STATUS.md` loads every session) and routes everything learned during the session to the appropriate `docs/memory/` file.
 
 The result is documentation that reflects what is actually true about the project right now — maintained continuously as a side effect of development work, not as a separate task someone needs to remember to do.
 
@@ -69,15 +69,15 @@ The result is documentation that reflects what is actually true about the projec
 
 ## Designed for lean context
 
-Every working file in MAP has a size ceiling enforced by the AI's own write rules (the deliberate exceptions are the append-only logs — `ARCHITECTURE_HISTORY.md`, `BUGS_ARCHIVE.md`, and `METRICS_HISTORY.md` — which have no size limit and are never summarised). `AGENTS.md` stays under 3,000 tokens (estimated as bytes ÷ 4). `docs/memory/gotchas.md` caps at ~750 tokens and `docs/memory/shared.md` at ~1,500 (both load every session). Other memory topic files cap at ~2,500 tokens. In Claude Code, the `map-token-check.sh` hook enforces all of these. When a file fills up, the AI summarises or removes before adding — so files stay dense and high-signal rather than growing without bound.
+Every working file in MAP has a size ceiling enforced by the AI's own write rules (the deliberate exceptions are the append-only logs — `ARCHITECTURE_HISTORY.md`, `BUGS_ARCHIVE.md`, `STATUS_ARCHIVE.md`, and `METRICS_HISTORY.md` — which have no size limit and are never summarised). `AGENTS.md` stays under 3,000 tokens (estimated as bytes ÷ 4) — measured in tokens, not lines, because it loads every session and one long line costs as much as many short ones. `docs/STATUS.md` caps at ~5,000 tokens (older progress entries move to `docs/STATUS_ARCHIVE.md`). `docs/memory/gotchas.md` caps at ~750 tokens and `docs/memory/shared.md` at ~1,500 (both load every session). Other memory topic files cap at ~2,500 tokens. In Claude Code, `.claude/hooks/map-token-check.sh` enforces all of these: at session start, and immediately after any edit that pushes a capped file over its cap. When a file fills up, the AI summarises or removes before adding — so files stay dense and high-signal rather than growing without bound.
 
 Beyond size caps, the structure itself controls what gets loaded:
 
-**Selective loading, not full context at startup.** `AGENTS.md`'s "Load when relevant" section tells the AI which files to read for which tasks. A session fixing a bug doesn't load `ARCHITECTURE.md` or `SCHEMA.md`. A session touching the database doesn't load `DOCKER.md`. Files are pulled on demand.
+**Selective loading, not full context at startup.** `AGENTS.md`'s "Load when relevant" section tells the AI which files to read for which tasks. A session fixing a bug doesn't load `ARCHITECTURE.md` or `SCHEMA.md`. A session touching the database doesn't load `DOCKER.md`. Files are pulled on demand. That's why those lines use plain paths: an `@docs/...` import in Claude Code or Gemini CLI loads the file at session start no matter what the rule says. Only the session start ritual's files (`STATUS.md`, `MEMORY.md`, `BUGS.md`) and `CLAUDE.local.md` are `@`-imported.
 
 **Index before content.** `MEMORY.md` is a one-page index — a table of topic files and entry counts. The AI reads it first to know what knowledge exists, then loads only the topic file relevant to the current task. `docs/memory/database.md` is never loaded during a UI fix.
 
-**History separated from current state.** `ARCHITECTURE_HISTORY.md` grows large over time; `ARCHITECTURE.md` stays a concise snapshot of current structure. You pay for historical decision tokens only when a decision is actively being revisited.
+**History separated from current state.** `ARCHITECTURE_HISTORY.md` has no size limit and is never summarised — it grows for the life of the project so no decision's reasoning is ever lost; `ARCHITECTURE.md` stays a concise snapshot of current structure. You pay for historical decision tokens only when a decision is actively being revisited.
 
 **Write-on-discovery keeps future context accurate.** The AI writes to docs immediately when it finds something rather than waiting until session end. Accurate docs mean future sessions don't waste tokens working from stale context or asking clarifying questions they shouldn't need to ask.
 
@@ -115,11 +115,14 @@ php artisan map:install --force
 | `.github/copilot-instructions.md` | Copilot entry point — AGENTS.md content inlined |
 | `.cursor/rules/agents.mdc` | Cursor entry point — imports AGENTS.md |
 | `.claude/hooks/map-first-run-check.sh` | Claude Code `SessionStart` hook — detects an un-initialized scaffold, see below |
-| `.claude/hooks/map-token-check.sh` | Claude Code `SessionStart`/`PostToolUse` hook — enforces the AGENTS.md and memory-file token caps |
+| `.claude/hooks/map-token-check.sh` | Claude Code `SessionStart`/`PostToolUse` hook — enforces the AGENTS.md, STATUS.md and memory-file token caps |
 | `.claude/settings.json` | Wires the hooks above (skipped, not overwritten, if you already have one — see below) |
 | `.map/merge.sh` | Git merge driver for MAP docs — rules first, then Claude for what's left; always stops for review when Claude was needed |
 | `.claude/skills/map-resolve/SKILL.md` | Claude Code skill to resolve and review MAP doc merge conflicts with you |
+| `.claude/skills/example-skill/SKILL.example.md` | Template for your own Claude Code skill — copy the folder and rename the file to `SKILL.md` |
 | `docs/STATUS.md` | Project health: build, tests, blockers, milestones |
+| `docs/STATUS_ARCHIVE.md` | Older STATUS.md progress entries — append-only, not loaded each session |
+| `docs/METRICS_HISTORY.md` | Dated metrics log, one entry per session end — append-only |
 | `docs/BUGS.md` | Open bugs (AI-maintained) |
 | `docs/BUGS_ARCHIVE.md` | Fixed bugs — append-only |
 | `docs/ARCHITECTURE.md` | Current system structure (AI-maintained) |
@@ -127,17 +130,20 @@ php artisan map:install --force
 | `docs/CODE_PATTERNS.md` | Project-specific patterns (AI-maintained) |
 | `docs/SCHEMA.md` | Database schema and service contracts (AI-maintained) |
 | `docs/GLOSSARY.md` | Domain terms and abbreviations |
+| `docs/COMMANDS.md` | Custom project commands, categorized (AI-maintained) |
+| `docs/COMPLIANCE.md` | Regulatory/compliance obligations (Claude proposes, you approve) |
+| `docs/DESIGN.md` | UI/frontend conventions (Claude proposes, you approve; delete if no UI) |
 | `docs/DOCKER.md` | Container and environment reference |
 | `docs/FEATURE_FLAGS.md` | Feature flag registry (AI-maintained) |
 | `docs/SETUP.md` | Local dev setup for new developers |
 | `docs/TESTING_COVERAGE.md` | Coverage tracking — updated from actual output |
-| `docs/MEMORY.example.md` | Memory index template (copy to `MEMORY.md` — gitignored) |
+| `docs/MEMORY.example.md` | Memory index template — `MEMORY.md` is created from it on install (gitignored) |
 | `docs/memory/*.example.md` | Per-topic memory templates: framework, database, testing, environment, performance, agents, shared |
 | `docs/agents/agent.example.md` | Template for documenting a specific agent |
 | `docs/api/api.example.md` | Template for documenting an API |
 | `docs/integrations/integration.example.md` | Template for documenting an integration |
 | `docs/architecture/architecture.example.md` | Template for documenting a subsystem or component |
-| `docs/qa/qa.example.md` | Template for a completed-feature QA record |
+| `docs/qa/qa.example.md` | Template for a completed-feature QA record — created only when you ask for one |
 
 ## First-run detection
 
