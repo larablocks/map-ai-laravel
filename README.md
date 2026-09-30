@@ -158,7 +158,7 @@ For Claude Code specifically, `.claude/hooks/map-first-run-check.sh` (wired via 
 The installer auto-detects your project name, stack, and common commands from `composer.json`, `package.json`, and `.env.example`. Review `AGENTS.md` after install — anything it couldn't detect will still show a `[...]` placeholder for you to fill in manually.
 
 1. Review `AGENTS.md` — verify auto-detected values on lines 2–3 and the Commands section; fill in any remaining `[...]` placeholders
-2. Each developer runs the `cp` commands in `docs/SETUP.md` step 3 to initialize their personal gitignored files
+2. Nothing else to copy: `map:install` already created your personal gitignored files (`docs/MEMORY.md`, `docs/memory/*.md`) from their templates, and on a teammate's fresh clone the first AI session creates any that are missing
 
 ## Merging MAP docs
 
